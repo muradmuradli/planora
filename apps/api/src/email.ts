@@ -14,3 +14,16 @@ export async function sendVerificationEmail(to: string, url: string) {
     `,
   });
 }
+
+export async function sendResetPasswordEmail(to: string, url: string) {
+  await resend.emails.send({
+    from: "Worksprint <onboarding@resend.dev>",
+    to,
+    subject: "Reset your password",
+    html: `
+      <p>We received a request to reset your Worksprint password.</p>
+      <p><a href="${url}">Reset password</a></p>
+      <p>If you didn't request this, you can safely ignore this email.</p>
+    `,
+  });
+}

@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +11,7 @@ import { toast, Toaster } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import {
   Card,
@@ -26,13 +28,19 @@ const signInSchema = z.object({
   password: z.string().min(8, "At least 8 characters"),
 });
 
-const signUpSchema = signInSchema.extend({
-  name: z
-    .string()
-    .trim()
-    .min(2, "Enter your full name")
-    .max(100, "Name is too long"),
-});
+const signUpSchema = signInSchema
+  .extend({
+    name: z
+      .string()
+      .trim()
+      .min(2, "Enter your full name")
+      .max(100, "Name is too long"),
+    confirmPassword: z.string().min(8, "At least 8 characters"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
 
 type SignInValues = z.infer<typeof signInSchema>;
 type SignUpValues = z.infer<typeof signUpSchema>;
@@ -49,7 +57,7 @@ function AuthPageContent() {
     resolver: zodResolver(
       (isSignUp ? signUpSchema : signInSchema) as unknown as typeof signUpSchema,
     ),
-    defaultValues: { name: "", email: "", password: "" },
+    defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
     mode: "onTouched",
   });
 
@@ -64,6 +72,11 @@ function AuthPageContent() {
     if (searchParams.get("verified")) {
       toast.success("Email verified", {
         description: "Your email is confirmed. You can sign in now.",
+      });
+      router.replace("/auth");
+    } else if (searchParams.get("reset")) {
+      toast.success("Password reset", {
+        description: "You can now sign in with your new password.",
       });
       router.replace("/auth");
     } else if (searchParams.get("error")) {
@@ -140,7 +153,7 @@ function AuthPageContent() {
 
   const toggleMode = () => {
     setMode((m) => (m === "signin" ? "signup" : "signin"));
-    reset({ name: "", email: "", password: "" });
+    reset({ name: "", email: "", password: "", confirmPassword: "" });
   };
 
   if (pendingEmail) {
@@ -174,7 +187,7 @@ function AuthPageContent() {
               onClick={() => {
                 setPendingEmail(null);
                 setMode("signin");
-                reset({ name: "", email: "", password: "" });
+                reset({ name: "", email: "", password: "", confirmPassword: "" });
               }}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
@@ -236,10 +249,19 @@ function AuthPageContent() {
               )}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="password">Password</Label>
-              <Input
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                {!isSignUp && (
+                  <Link
+                    href="/auth/forgot-password"
+                    className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    Forgot password?
+                  </Link>
+                )}
+              </div>
+              <PasswordInput
                 id="password"
-                type="password"
                 autoComplete={isSignUp ? "new-password" : "current-password"}
                 placeholder="••••••••"
                 aria-invalid={!!errors.password}
@@ -251,6 +273,23 @@ function AuthPageContent() {
                 </p>
               )}
             </div>
+            {isSignUp && (
+              <div className="space-y-1.5">
+                <Label htmlFor="confirmPassword">Confirm password</Label>
+                <PasswordInput
+                  id="confirmPassword"
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  aria-invalid={!!errors.confirmPassword}
+                  {...register("confirmPassword")}
+                />
+                {errors.confirmPassword && (
+                  <p className="text-xs text-destructive">
+                    {errors.confirmPassword.message}
+                  </p>
+                )}
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="animate-spin" />}
               {isSubmitting
