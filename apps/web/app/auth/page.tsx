@@ -6,21 +6,18 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Loader2, Mail, MailCheck, MailIcon, User, Lock, ArrowRight } from 'lucide-react';
-import { toast, Toaster } from 'sonner';
+import { Loader2, MailCheck, MailIcon, User, Lock, ArrowRight } from 'lucide-react';
+import { toast } from 'sonner';
 
-import Image from 'next/image';
-import HeroImage from '@/public/office.jpg';
+import { AuthShell } from '@/components/auth/auth-shell';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Label } from '@/components/ui/label';
 import {
-  Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -207,259 +204,228 @@ function AuthPageContent() {
 
   if (pendingEmail) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-linear-to-br from-background via-background to-muted px-4 py-12">
-        <Toaster richColors position="top-center" />
-        <Card className="w-full max-w-md shadow-lg text-center">
-          <CardHeader className="items-center space-y-3">
-            <MailCheck className="h-10 w-10 text-primary" />
-            <CardTitle className="text-2xl font-semibold tracking-tight">
-              Check your email
-            </CardTitle>
-            <CardDescription>
-              We sent a verification link to{' '}
-              <span className="font-medium text-foreground">
-                {pendingEmail}
-              </span>
-              . Click it to activate your account, then come back and sign in.
-            </CardDescription>
-          </CardHeader>
-          <CardFooter className="flex flex-col gap-3">
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={handleResend}
-              disabled={resending}
-            >
-              {resending && <Loader2 className="animate-spin" />}
-              {resending ? 'Resending...' : 'Resend email'}
-            </Button>
-            <button
-              type="button"
-              onClick={() => {
-                setPendingEmail(null);
-                setMode('signin');
-                reset({
-                  name: '',
-                  email: '',
-                  password: '',
-                  confirmPassword: '',
-                });
-              }}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Back to sign in
-            </button>
-          </CardFooter>
-        </Card>
-      </div>
+      <AuthShell>
+        <CardHeader className="items-center text-center space-y-3">
+         <div className="flex items-center gap-3">
+           <MailCheck className="h-10 w-10 text-rose-600" />
+          <CardTitle className="text-2xl font-semibold tracking-tight">
+            Check your email
+          </CardTitle>
+         </div>
+          <CardDescription className="mb-4">
+            We sent a verification link to{' '}
+            <span className="font-medium text-foreground">
+              {pendingEmail}
+            </span>
+            . Click it to activate your account, then come back and sign in.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="outline"
+            className="w-full py-5 rounded-xl"
+            onClick={handleResend}
+            disabled={resending}
+          >
+            {resending && <Loader2 className="animate-spin" />}
+            {resending ? 'Resending...' : 'Resend email'}
+          </Button>
+        </CardContent>
+        <div className="flex justify-center mt-3">
+          <button
+            type="button"
+            onClick={() => {
+              setPendingEmail(null);
+              setMode('signin');
+              reset({
+                name: '',
+                email: '',
+                password: '',
+                confirmPassword: '',
+              });
+            }}
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Back to sign in
+          </button>
+        </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center bg-linear-to-br from-background via-background to-muted">
-      <Toaster richColors position="top-center" />
-      <div className="flex w-6/12 justify-center items-center">
-        <div className="w-5/12 border-0">
-          <CardHeader className="text-start">
-            <Logo />
-            <CardTitle className="text-2xl font-semibold tracking-tight">
-              {isSignUp ? 'Create your account' : 'Welcome back'}
-            </CardTitle>
-            <CardDescription>
-              {isSignUp
-                ? 'Enter your details to get started.'
-                : 'Sign in to continue to your account.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="my-4">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full py-5 rounded-xl"
-              onClick={handleGoogleSignIn}
-              disabled={googleLoading}
-            >
-              {googleLoading ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <GoogleIcon className="size-4" />
-              )}
-              {googleLoading ? 'Redirecting...' : 'Continue with Google'}
-            </Button>
-            <div className="relative mt-5">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="bg-card px-2 text-muted-foreground">
-                  Or continue with email
-                </span>
-              </div>
-            </div>
-          </CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} noValidate>
-            <CardContent className="space-y-4">
-              {isSignUp && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="name">Full name</Label>
-                  <div className="relative">
-                    <User className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                    className="py-5 pl-12 rounded-xl"
-                    id="name"
-                    autoComplete="name"
-                    placeholder="Jane Doe"
-                    aria-invalid={!!errors.name}
-                    {...register('name')}
-                  />
-                  </div>
-                  {errors.name && (
-                    <p className="text-xs text-destructive">
-                      {errors.name.message}
-                    </p>
-                  )}
-                </div>
-              )}
-              <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
-
-                <div className="relative">
-                  <MailIcon className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    className="py-5 pl-12 rounded-xl"
-                    id="email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="you@example.com"
-                    aria-invalid={!!errors.email}
-                    {...register('email')}
-                  />
-                </div>
-                {errors.email && (
-                  <p className="text-xs text-destructive">
-                    {errors.email.message}
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  {!isSignUp && (
-                    <Link
-                      href="/auth/forgot-password"
-                      className="text-xs text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      Forgot password?
-                    </Link>
-                  )}
-                </div>
-
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <PasswordInput
-                    className="py-5 pl-12 rounded-xl"
-                    id="password"
-                    autoComplete={isSignUp ? 'new-password' : 'current-password'}
-                    placeholder="••••••••"
-                    aria-invalid={!!errors.password}
-                    {...register('password')}
-                  />
-                </div>
-                {errors.password && (
-                  <p className="text-xs text-destructive">
-                    {errors.password.message}
-                  </p>
-                )}
-              </div>
-              {isSignUp && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="confirmPassword">Confirm password</Label>
-                  
-                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                    <PasswordInput
-                      className="py-5 pl-12 rounded-xl"
-                      id="confirmPassword"
-                      autoComplete="new-password"
-                      placeholder="••••••••"
-                      aria-invalid={!!errors.confirmPassword}
-                      {...register('confirmPassword')}
-                    />
-                  </div>
-                  {errors.confirmPassword && (
-                    <p className="text-xs text-destructive">
-                      {errors.confirmPassword.message}
-                    </p>
-                  )}
-                </div>
-              )}
-              <Button type="submit" className="w-full py-6 bg-rose-600 hover:bg-rose-500 text-white rounded-xl" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="animate-spin" />}
-                {isSubmitting
-                  ? isSignUp
-                    ? 'Creating account...'
-                    : 'Signing in...'
-                  : isSignUp
-                    ? 'Create account'
-                    : 'Sign in'}
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </CardContent>
-          </form>
-          <div className="flex justify-center mt-3">
-            <button
-              type="button"
-              onClick={toggleMode}
-              className="text-sm text-muted-foreground transition-colors"
-            >
-              {isSignUp ? (
-                <>
-                  Already have an account?{' '}
-                  <span className="font-medium text-primary underline-offset-4 hover:underline">
-                    Sign in
-                  </span>
-                </>
-              ) : (
-                <>
-                  Don't have an account?{' '}
-                  <span className="font-medium text-primary underline-offset-4 hover:underline">
-                    Sign up
-                  </span>
-                </>
-              )}
-            </button>
+    <AuthShell>
+      <CardHeader className="text-start">
+        <Logo />
+        <CardTitle className="text-2xl font-semibold tracking-tight">
+          {isSignUp ? 'Create your account' : 'Welcome back'}
+        </CardTitle>
+        <CardDescription>
+          {isSignUp
+            ? 'Enter your details to get started.'
+            : 'Sign in to continue to your account.'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="my-4">
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full py-5 rounded-xl"
+          onClick={handleGoogleSignIn}
+          disabled={googleLoading}
+        >
+          {googleLoading ? (
+            <Loader2 className="animate-spin" />
+          ) : (
+            <GoogleIcon className="size-4" />
+          )}
+          {googleLoading ? 'Redirecting...' : 'Continue with Google'}
+        </Button>
+        <div className="relative mt-5">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs">
+            <span className="bg-card px-2 text-muted-foreground">
+              Or continue with email
+            </span>
           </div>
         </div>
-      </div>
-      <div className="w-6/12 h-screen relative overflow-hidden">
-        {/* Background image */}
-        <Image
-          src={HeroImage}
-          alt="Hero"
-          fill
-          priority
-          className="object-cover"
-        />
-
-        {/* Dark overlay */}
-        <div className="absolute inset-0 bg-black/45" />
-
-        {/* Content */}
-        <div className="absolute inset-0 z-10 flex items-end p-16">
-          <div className="max-w-lg text-white">
-            <p className="text-3xl font-semibold leading-tight">
-              “This platform completely transformed the way our team works.
-              Everything is faster, cleaner, and far easier to manage.”
-            </p>
-
-            <div className="mt-8">
-              <p className="font-semibold">Sarah Johnson</p>
-              <p className="text-white/80">Product Manager at Acme Inc.</p>
+      </CardContent>
+      <form onSubmit={handleSubmit(onSubmit)} noValidate>
+        <CardContent className="space-y-4">
+          {isSignUp && (
+            <div className="space-y-1.5">
+              <Label htmlFor="name">Full name</Label>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="py-5 pl-12 rounded-xl"
+                  id="name"
+                  autoComplete="name"
+                  placeholder="Jane Doe"
+                  aria-invalid={!!errors.name}
+                  {...register('name')}
+                />
+              </div>
+              {errors.name && (
+                <p className="text-xs text-destructive">
+                  {errors.name.message}
+                </p>
+              )}
             </div>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="email">Email</Label>
+            <div className="relative">
+              <MailIcon className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="py-5 pl-12 rounded-xl"
+                id="email"
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                aria-invalid={!!errors.email}
+                {...register('email')}
+              />
+            </div>
+            {errors.email && (
+              <p className="text-xs text-destructive">
+                {errors.email.message}
+              </p>
+            )}
           </div>
-        </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              {!isSignUp && (
+                <Link
+                  href="/auth/forgot-password"
+                  className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Forgot password?
+                </Link>
+              )}
+            </div>
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+              <PasswordInput
+                className="py-5 pl-12 rounded-xl"
+                id="password"
+                autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                placeholder="••••••••"
+                aria-invalid={!!errors.password}
+                {...register('password')}
+              />
+            </div>
+            {errors.password && (
+              <p className="text-xs text-destructive">
+                {errors.password.message}
+              </p>
+            )}
+          </div>
+          {isSignUp && (
+            <div className="space-y-1.5">
+              <Label htmlFor="confirmPassword">Confirm password</Label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                <PasswordInput
+                  className="py-5 pl-12 rounded-xl"
+                  id="confirmPassword"
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  aria-invalid={!!errors.confirmPassword}
+                  {...register('confirmPassword')}
+                />
+              </div>
+              {errors.confirmPassword && (
+                <p className="text-xs text-destructive">
+                  {errors.confirmPassword.message}
+                </p>
+              )}
+            </div>
+          )}
+          <Button
+            type="submit"
+            className="w-full py-6 bg-rose-600 hover:bg-rose-500 text-white rounded-xl"
+            disabled={isSubmitting}
+          >
+            {isSubmitting && <Loader2 className="animate-spin" />}
+            {isSubmitting
+              ? isSignUp
+                ? 'Creating account...'
+                : 'Signing in...'
+              : isSignUp
+                ? 'Create account'
+                : 'Sign in'}
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </CardContent>
+      </form>
+      <div className="flex justify-center mt-3">
+        <button
+          type="button"
+          onClick={toggleMode}
+          className="text-sm text-muted-foreground transition-colors"
+        >
+          {isSignUp ? (
+            <>
+              Already have an account?{' '}
+              <span className="font-medium text-primary underline-offset-4 hover:underline">
+                Sign in
+              </span>
+            </>
+          ) : (
+            <>
+              Don't have an account?{' '}
+              <span className="font-medium text-primary underline-offset-4 hover:underline">
+                Sign up
+              </span>
+            </>
+          )}
+        </button>
       </div>
-    </div>
+    </AuthShell>
   );
 }
 
