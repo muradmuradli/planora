@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, MailCheck } from "lucide-react";
 import { toast, Toaster } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -36,8 +37,12 @@ const signUpSchema = signInSchema.extend({
 type SignInValues = z.infer<typeof signInSchema>;
 type SignUpValues = z.infer<typeof signUpSchema>;
 
-export default function AuthPage() {
+function AuthPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
   const isSignUp = mode === "signup";
 
   const form = useForm<SignUpValues>({
@@ -55,6 +60,23 @@ export default function AuthPage() {
     formState: { errors, isSubmitting },
   } = form;
 
+  useEffect(() => {
+    if (searchParams.get("verified")) {
+      toast.success("Email verified", {
+        description: "Your email is confirmed. You can sign in now.",
+      });
+      router.replace("/auth");
+    } else if (searchParams.get("error")) {
+      toast.error("Verification link didn't work", {
+        description:
+          "It may have expired. Sign up again or request a new link.",
+      });
+      router.replace("/auth");
+    }
+  }, [searchParams, router]);
+
+  const verificationCallbackURL = () => `${window.location.origin}/auth?verified=1`;
+
   const onSubmit = async (values: SignUpValues) => {
     try {
       if (isSignUp) {
@@ -62,17 +84,26 @@ export default function AuthPage() {
           name: values.name,
           email: values.email,
           password: values.password,
+          callbackURL: verificationCallbackURL(),
         });
         if (error) throw new Error(error.message ?? "Sign up failed");
-        toast.success("Account created", {
-          description: "Welcome aboard! You're all set.",
-        });
+        setPendingEmail(values.email);
       } else {
         const { error } = await authClient.signIn.email({
           email: values.email,
           password: values.password,
+          callbackURL: verificationCallbackURL(),
         });
-        if (error) throw new Error(error.message ?? "Sign in failed");
+        if (error) {
+          if (error.code === "EMAIL_NOT_VERIFIED") {
+            setPendingEmail(values.email);
+            toast.info("Verify your email first", {
+              description: "We just sent a fresh verification link to your inbox.",
+            });
+            return;
+          }
+          throw new Error(error.message ?? "Sign in failed");
+        }
         toast.success("Signed in", {
           description: "Good to see you again.",
         });
@@ -86,10 +117,74 @@ export default function AuthPage() {
     }
   };
 
+  const handleResend = async () => {
+    if (!pendingEmail) return;
+    setResending(true);
+    try {
+      const { error } = await authClient.sendVerificationEmail({
+        email: pendingEmail,
+        callbackURL: verificationCallbackURL(),
+      });
+      if (error) throw new Error(error.message ?? "Couldn't resend the email");
+      toast.success("Email sent", {
+        description: "Check your inbox for the new link.",
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Something went wrong";
+      toast.error("Couldn't resend email", { description: message });
+    } finally {
+      setResending(false);
+    }
+  };
+
   const toggleMode = () => {
     setMode((m) => (m === "signin" ? "signup" : "signin"));
     reset({ name: "", email: "", password: "" });
   };
+
+  if (pendingEmail) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-linear-to-br from-background via-background to-muted px-4 py-12">
+        <Toaster richColors position="top-center" />
+        <Card className="w-full max-w-md shadow-lg text-center">
+          <CardHeader className="items-center space-y-3">
+            <MailCheck className="h-10 w-10 text-primary" />
+            <CardTitle className="text-2xl font-semibold tracking-tight">
+              Check your email
+            </CardTitle>
+            <CardDescription>
+              We sent a verification link to{" "}
+              <span className="font-medium text-foreground">{pendingEmail}</span>.
+              Click it to activate your account, then come back and sign in.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="flex flex-col gap-3">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleResend}
+              disabled={resending}
+            >
+              {resending && <Loader2 className="animate-spin" />}
+              {resending ? "Resending..." : "Resend email"}
+            </Button>
+            <button
+              type="button"
+              onClick={() => {
+                setPendingEmail(null);
+                setMode("signin");
+                reset({ name: "", email: "", password: "" });
+              }}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Back to sign in
+            </button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-linear-to-br from-background via-background to-muted px-4 py-12">
@@ -193,5 +288,13 @@ export default function AuthPage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={null}>
+      <AuthPageContent />
+    </Suspense>
   );
 }
