@@ -4,7 +4,7 @@ import HeroImage from '@/public/office.jpg';
 
 export function AuthHeroPanel() {
   return (
-    <div className="w-6/12 h-screen relative overflow-hidden">
+    <div className="hidden lg:block lg:w-6/12 h-screen relative overflow-hidden">
       <Image src={HeroImage} alt="Hero" fill priority className="object-cover" />
       <div className="absolute inset-0 bg-black/45" />
       <div className="absolute inset-0 z-10 flex items-end p-16">
