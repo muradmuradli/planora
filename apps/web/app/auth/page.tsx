@@ -46,6 +46,8 @@ const signUpSchema = signInSchema
 type SignInValues = z.infer<typeof signInSchema>;
 type SignUpValues = z.infer<typeof signUpSchema>;
 
+type AuthMode = 'signin' | 'signup';
+
 function GoogleIcon(props: ComponentProps<'svg'>) {
   return (
     <svg viewBox="0 0 24 24" {...props}>
@@ -69,31 +71,31 @@ function GoogleIcon(props: ComponentProps<'svg'>) {
   );
 }
 
+function errorMessage(err: unknown, fallback: string) {
+  return err instanceof Error ? err.message : fallback;
+}
+
 function AuthPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+
+  const [mode, setMode] = useState<AuthMode>('signin');
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const isSignUp = mode === 'signup';
 
-  const form = useForm<SignUpValues>({
-    resolver: zodResolver(
-      (isSignUp
-        ? signUpSchema
-        : signInSchema) as unknown as typeof signUpSchema,
-    ),
-    defaultValues: { name: '', email: '', password: '', confirmPassword: '' },
+  const signInForm = useForm<SignInValues>({
+    resolver: zodResolver(signInSchema),
+    defaultValues: { email: '', password: '' },
     mode: 'onTouched',
   });
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = form;
+  const signUpForm = useForm<SignUpValues>({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: { name: '', email: '', password: '', confirmPassword: '' },
+    mode: 'onTouched',
+  });
 
   useEffect(() => {
     if (searchParams.get('verified')) {
@@ -118,45 +120,75 @@ function AuthPageContent() {
   const verificationCallbackURL = () =>
     `${window.location.origin}/auth?verified=1`;
 
-  const onSubmit = async (values: SignUpValues) => {
+  const sendVerification = async (email: string) => {
+    const { error } = await authClient.sendVerificationEmail({
+      email,
+      callbackURL: verificationCallbackURL(),
+    });
+    if (error) throw new Error(error.message ?? "Couldn't send verification email");
+  };
+
+  const goToPendingVerification = (email: string) => {
+    setPendingEmail(email);
+    setMode('signin');
+  };
+
+  const onSignUp = async (values: SignUpValues) => {
     try {
-      if (isSignUp) {
-        const { error } = await authClient.signUp.email({
-          name: values.name,
-          email: values.email,
-          password: values.password,
-          callbackURL: verificationCallbackURL(),
-        });
-        console.log(values);
-        if (error) throw new Error(error.message ?? 'Sign up failed');
-        setPendingEmail(values.email);
-      } else {
-        const { error } = await authClient.signIn.email({
-          email: values.email,
-          password: values.password,
-          callbackURL: verificationCallbackURL(),
-        });
-        console.log(error);
-        if (error) {
-          if (error.code === 'EMAIL_NOT_VERIFIED') {
-            setPendingEmail(values.email);
+      const { error } = await authClient.signUp.email({
+        name: values.name,
+        email: values.email,
+        password: values.password,
+        callbackURL: verificationCallbackURL(),
+      });
+      if (error) throw new Error(error.message ?? 'Sign up failed');
+
+      toast.success('Account created', {
+        description: 'Check your email to verify your account, then sign in.',
+      });
+      goToPendingVerification(values.email);
+      signUpForm.reset();
+    } catch (err) {
+      toast.error('Sign up failed', {
+        description: errorMessage(err, 'Something went wrong'),
+      });
+    }
+  };
+
+  const onSignIn = async (values: SignInValues) => {
+    try {
+      const { error } = await authClient.signIn.email({
+        email: values.email,
+        password: values.password,
+      });
+
+      if (error) {
+        if (error.code === 'EMAIL_NOT_VERIFIED') {
+          goToPendingVerification(values.email);
+          try {
+            await sendVerification(values.email);
             toast.info('Verify your email first', {
               description:
                 'We just sent a fresh verification link to your inbox.',
             });
-            return;
+          } catch {
+            toast.info('Verify your email first', {
+              description:
+                'Check your inbox for the verification link, or resend it below.',
+            });
           }
-          throw new Error(error.message ?? 'Sign in failed');
+          return;
         }
-        toast.success('Signed in', {
-          description: 'Good to see you again.',
-        });
+        throw new Error(error.message ?? 'Sign in failed');
       }
+
+      toast.success('Welcome back!', {
+        description: 'Good to see you again.',
+      });
+      router.push('/');
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Something went wrong';
-      toast.error(isSignUp ? 'Sign up failed' : 'Sign in failed', {
-        description: message,
+      toast.error('Sign in failed', {
+        description: errorMessage(err, 'Something went wrong'),
       });
     }
   };
@@ -171,9 +203,9 @@ function AuthPageContent() {
       if (error)
         throw new Error(error.message ?? "Couldn't sign in with Google");
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Something went wrong';
-      toast.error("Couldn't sign in with Google", { description: message });
+      toast.error("Couldn't sign in with Google", {
+        description: errorMessage(err, 'Something went wrong'),
+      });
       setGoogleLoading(false);
     }
   };
@@ -182,18 +214,14 @@ function AuthPageContent() {
     if (!pendingEmail) return;
     setResending(true);
     try {
-      const { error } = await authClient.sendVerificationEmail({
-        email: pendingEmail,
-        callbackURL: verificationCallbackURL(),
-      });
-      if (error) throw new Error(error.message ?? "Couldn't resend the email");
+      await sendVerification(pendingEmail);
       toast.success('Email sent', {
         description: 'Check your inbox for the new link.',
       });
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Something went wrong';
-      toast.error("Couldn't resend email", { description: message });
+      toast.error("Couldn't resend email", {
+        description: errorMessage(err, 'Something went wrong'),
+      });
     } finally {
       setResending(false);
     }
@@ -201,19 +229,26 @@ function AuthPageContent() {
 
   const toggleMode = () => {
     setMode((m) => (m === 'signin' ? 'signup' : 'signin'));
-    reset({ name: '', email: '', password: '', confirmPassword: '' });
+    signInForm.reset();
+    signUpForm.reset();
+  };
+
+  const backToSignIn = () => {
+    setPendingEmail(null);
+    setMode('signin');
+    signInForm.reset();
   };
 
   if (pendingEmail) {
     return (
       <AuthShell>
         <CardHeader className="items-center text-center space-y-3">
-         <div className="flex items-center gap-3">
-           <MailCheck className="h-10 w-10 text-rose-600" />
-          <CardTitle className="text-2xl font-semibold tracking-tight">
-            Check your email
-          </CardTitle>
-         </div>
+          <div className="flex items-center gap-3">
+            <MailCheck className="h-10 w-10 text-rose-600" />
+            <CardTitle className="text-2xl font-semibold tracking-tight">
+              Check your email
+            </CardTitle>
+          </div>
           <CardDescription className="mb-4">
             We sent a verification link to{' '}
             <span className="font-medium text-foreground">
@@ -236,16 +271,7 @@ function AuthPageContent() {
         <div className="flex justify-center mt-3">
           <button
             type="button"
-            onClick={() => {
-              setPendingEmail(null);
-              setMode('signin');
-              reset({
-                name: '',
-                email: '',
-                password: '',
-                confirmPassword: '',
-              });
-            }}
+            onClick={backToSignIn}
             className="text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             Back to sign in
@@ -294,9 +320,10 @@ function AuthPageContent() {
           </div>
         </div>
       </CardContent>
-      <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <CardContent className="space-y-4">
-          {isSignUp && (
+
+      {isSignUp ? (
+        <form onSubmit={signUpForm.handleSubmit(onSignUp)} noValidate>
+          <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="name">Full name</Label>
               <div className="relative">
@@ -306,67 +333,55 @@ function AuthPageContent() {
                   id="name"
                   autoComplete="name"
                   placeholder="Jane Doe"
-                  aria-invalid={!!errors.name}
-                  {...register('name')}
+                  aria-invalid={!!signUpForm.formState.errors.name}
+                  {...signUpForm.register('name')}
                 />
               </div>
-              {errors.name && (
+              {signUpForm.formState.errors.name && (
                 <p className="text-xs text-destructive">
-                  {errors.name.message}
+                  {signUpForm.formState.errors.name.message}
                 </p>
               )}
             </div>
-          )}
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <div className="relative">
-              <MailIcon className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                className="py-5 pl-12 rounded-xl"
-                id="email"
-                type="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                aria-invalid={!!errors.email}
-                {...register('email')}
-              />
-            </div>
-            {errors.email && (
-              <p className="text-xs text-destructive">
-                {errors.email.message}
-              </p>
-            )}
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              {!isSignUp && (
-                <Link
-                  href="/auth/forgot-password"
-                  className="text-xs text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  Forgot password?
-                </Link>
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email</Label>
+              <div className="relative">
+                <MailIcon className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="py-5 pl-12 rounded-xl"
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  aria-invalid={!!signUpForm.formState.errors.email}
+                  {...signUpForm.register('email')}
+                />
+              </div>
+              {signUpForm.formState.errors.email && (
+                <p className="text-xs text-destructive">
+                  {signUpForm.formState.errors.email.message}
+                </p>
               )}
             </div>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-              <PasswordInput
-                className="py-5 pl-12 rounded-xl"
-                id="password"
-                autoComplete={isSignUp ? 'new-password' : 'current-password'}
-                placeholder="••••••••"
-                aria-invalid={!!errors.password}
-                {...register('password')}
-              />
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                <PasswordInput
+                  className="py-5 pl-12 rounded-xl"
+                  id="password"
+                  autoComplete="new-password"
+                  placeholder="••••••••"
+                  aria-invalid={!!signUpForm.formState.errors.password}
+                  {...signUpForm.register('password')}
+                />
+              </div>
+              {signUpForm.formState.errors.password && (
+                <p className="text-xs text-destructive">
+                  {signUpForm.formState.errors.password.message}
+                </p>
+              )}
             </div>
-            {errors.password && (
-              <p className="text-xs text-destructive">
-                {errors.password.message}
-              </p>
-            )}
-          </div>
-          {isSignUp && (
             <div className="space-y-1.5">
               <Label htmlFor="confirmPassword">Confirm password</Label>
               <div className="relative">
@@ -376,34 +391,96 @@ function AuthPageContent() {
                   id="confirmPassword"
                   autoComplete="new-password"
                   placeholder="••••••••"
-                  aria-invalid={!!errors.confirmPassword}
-                  {...register('confirmPassword')}
+                  aria-invalid={!!signUpForm.formState.errors.confirmPassword}
+                  {...signUpForm.register('confirmPassword')}
                 />
               </div>
-              {errors.confirmPassword && (
+              {signUpForm.formState.errors.confirmPassword && (
                 <p className="text-xs text-destructive">
-                  {errors.confirmPassword.message}
+                  {signUpForm.formState.errors.confirmPassword.message}
                 </p>
               )}
             </div>
-          )}
-          <Button
-            type="submit"
-            className="w-full py-6 bg-rose-600 hover:bg-rose-500 text-white rounded-xl"
-            disabled={isSubmitting}
-          >
-            {isSubmitting && <Loader2 className="animate-spin" />}
-            {isSubmitting
-              ? isSignUp
+            <Button
+              type="submit"
+              className="w-full py-6 bg-rose-600 hover:bg-rose-500 text-white rounded-xl"
+              disabled={signUpForm.formState.isSubmitting}
+            >
+              {signUpForm.formState.isSubmitting && (
+                <Loader2 className="animate-spin" />
+              )}
+              {signUpForm.formState.isSubmitting
                 ? 'Creating account...'
-                : 'Signing in...'
-              : isSignUp
-                ? 'Create account'
-                : 'Sign in'}
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </CardContent>
-      </form>
+                : 'Create account'}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </CardContent>
+        </form>
+      ) : (
+        <form onSubmit={signInForm.handleSubmit(onSignIn)} noValidate>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email</Label>
+              <div className="relative">
+                <MailIcon className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="py-5 pl-12 rounded-xl"
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  aria-invalid={!!signInForm.formState.errors.email}
+                  {...signInForm.register('email')}
+                />
+              </div>
+              {signInForm.formState.errors.email && (
+                <p className="text-xs text-destructive">
+                  {signInForm.formState.errors.email.message}
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link
+                  href="/auth/forgot-password"
+                  className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                <PasswordInput
+                  className="py-5 pl-12 rounded-xl"
+                  id="password"
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  aria-invalid={!!signInForm.formState.errors.password}
+                  {...signInForm.register('password')}
+                />
+              </div>
+              {signInForm.formState.errors.password && (
+                <p className="text-xs text-destructive">
+                  {signInForm.formState.errors.password.message}
+                </p>
+              )}
+            </div>
+            <Button
+              type="submit"
+              className="w-full py-6 bg-rose-600 hover:bg-rose-500 text-white rounded-xl"
+              disabled={signInForm.formState.isSubmitting}
+            >
+              {signInForm.formState.isSubmitting && (
+                <Loader2 className="animate-spin" />
+              )}
+              {signInForm.formState.isSubmitting ? 'Signing in...' : 'Sign in'}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </CardContent>
+        </form>
+      )}
+
       <div className="flex justify-center mt-3">
         <button
           type="button"
