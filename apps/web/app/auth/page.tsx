@@ -85,6 +85,9 @@ function AuthPageContent() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const isSignUp = mode === 'signup';
 
+  const redirectParam = searchParams.get('redirect');
+  const redirectTo = redirectParam?.startsWith('/') ? redirectParam : '/';
+
   const signInForm = useForm<SignInValues>({
     resolver: zodResolver(signInSchema),
     defaultValues: { email: '', password: '' },
@@ -185,7 +188,7 @@ function AuthPageContent() {
       toast.success('Welcome back!', {
         description: 'Good to see you again.',
       });
-      router.push('/');
+      router.push(redirectTo);
     } catch (err) {
       toast.error('Sign in failed', {
         description: errorMessage(err, 'Something went wrong'),
@@ -198,7 +201,7 @@ function AuthPageContent() {
     try {
       const { error } = await authClient.signIn.social({
         provider: 'google',
-        callbackURL: `${window.location.origin}/`,
+        callbackURL: `${window.location.origin}${redirectTo}`,
       });
       if (error)
         throw new Error(error.message ?? "Couldn't sign in with Google");

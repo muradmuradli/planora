@@ -1,6 +1,6 @@
 'use client';
 
-import { lazy, Suspense, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast, Toaster } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { apiFetch, ApiError } from "@/lib/api";
+import { authClient } from "@/lib/auth-client";
 
 const LocationPicker = lazy(() =>
   import("@/components/location-picker").then((m) => ({ default: m.LocationPicker })),
@@ -59,6 +60,13 @@ function newTicketType(name = ""): TicketTypeForm {
 
 export default function CreateEventPage() {
   const router = useRouter();
+  const { data: session, isPending: isSessionPending } = authClient.useSession();
+
+  useEffect(() => {
+    if (!isSessionPending && !session?.user) {
+      router.replace("/auth?redirect=/create-event");
+    }
+  }, [isSessionPending, session, router]);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -164,6 +172,17 @@ export default function CreateEventPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (isSessionPending || !session?.user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="flex h-[60vh] items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
