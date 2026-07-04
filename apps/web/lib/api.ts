@@ -23,3 +23,25 @@ export async function apiFetch(path: string, init?: RequestInit) {
 
   return res.json();
 }
+
+export async function uploadImage(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append('image', file);
+
+  const res = await fetch(`${API_URL}/uploads/image`, {
+    method: 'POST',
+    credentials: 'include',
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    const message = Array.isArray(body?.message)
+      ? body.message.join(', ')
+      : body?.message;
+    throw new ApiError(message || `Upload failed with status ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.url;
+}

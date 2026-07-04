@@ -14,7 +14,7 @@ import {
   DollarSign, Upload, Plus, Trash2, ChevronRight, Video, Link2, Key, Loader2
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { apiFetch, ApiError } from "@/lib/api";
+import { apiFetch, uploadImage, ApiError } from "@/lib/api";
 import { authClient } from "@/lib/auth-client";
 
 const LocationPicker = lazy(() =>
@@ -128,35 +128,37 @@ export default function CreateEventPage() {
       return;
     }
 
-    const payload = {
-      title: title.trim(),
-      description: description.trim() || undefined,
-      category,
-      visibility,
-      startDate: new Date(startDate).toISOString(),
-      endDate: new Date(endDate).toISOString(),
-      isOnline,
-      location: isOnline ? undefined : location.trim(),
-      videoPlatform: isOnline ? videoPlatform : undefined,
-      eventLink: isOnline ? eventLink.trim() : undefined,
-      meetingId: isOnline ? meetingId.trim() || undefined : undefined,
-      passcode: isOnline ? passcode.trim() || undefined : undefined,
-      accessInstructions: isOnline ? accessInstructions.trim() || undefined : undefined,
-      imageUrl: imageFile ? imageFile.name : undefined,
-      ticketTypes: ticketTypes
-        .filter((t) => t.name.trim())
-        .map((t) => ({
-          name: t.name.trim(),
-          price: Number(t.price) || 0,
-          quantity: t.quantity.trim() ? Number(t.quantity) : undefined,
-          salesEndDate: t.salesEndDate
-            ? new Date(t.salesEndDate).toISOString()
-            : undefined,
-        })),
-    };
-
     setIsSubmitting(true);
     try {
+      const imageUrl = imageFile ? await uploadImage(imageFile) : undefined;
+
+      const payload = {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        category,
+        visibility,
+        startDate: new Date(startDate).toISOString(),
+        endDate: new Date(endDate).toISOString(),
+        isOnline,
+        location: isOnline ? undefined : location.trim(),
+        videoPlatform: isOnline ? videoPlatform : undefined,
+        eventLink: isOnline ? eventLink.trim() : undefined,
+        meetingId: isOnline ? meetingId.trim() || undefined : undefined,
+        passcode: isOnline ? passcode.trim() || undefined : undefined,
+        accessInstructions: isOnline ? accessInstructions.trim() || undefined : undefined,
+        imageUrl,
+        ticketTypes: ticketTypes
+          .filter((t) => t.name.trim())
+          .map((t) => ({
+            name: t.name.trim(),
+            price: Number(t.price) || 0,
+            quantity: t.quantity.trim() ? Number(t.quantity) : undefined,
+            salesEndDate: t.salesEndDate
+              ? new Date(t.salesEndDate).toISOString()
+              : undefined,
+          })),
+      };
+
       await apiFetch("/events", {
         method: "POST",
         body: JSON.stringify(payload),
