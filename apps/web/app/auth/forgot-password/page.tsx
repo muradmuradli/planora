@@ -83,7 +83,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <AuthShell>
-      <CardHeader className="text-start">
+      <CardHeader className="text-start mb-5">
         <Logo />
         <CardTitle className="text-2xl font-semibold tracking-tight">
           Forgot your password?

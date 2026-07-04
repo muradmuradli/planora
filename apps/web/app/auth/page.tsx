@@ -127,6 +127,7 @@ function AuthPageContent() {
           password: values.password,
           callbackURL: verificationCallbackURL(),
         });
+        console.log(values);
         if (error) throw new Error(error.message ?? 'Sign up failed');
         setPendingEmail(values.email);
       } else {
@@ -135,6 +136,7 @@ function AuthPageContent() {
           password: values.password,
           callbackURL: verificationCallbackURL(),
         });
+        console.log(error);
         if (error) {
           if (error.code === 'EMAIL_NOT_VERIFIED') {
             setPendingEmail(values.email);
