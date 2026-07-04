@@ -16,29 +16,12 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { apiFetch, uploadImage, ApiError } from "@/lib/api";
 import { authClient } from "@/lib/auth-client";
+import { CATEGORY_OPTIONS } from "@/lib/categories";
+import { VIDEO_PLATFORM_OPTIONS } from "@/lib/video-platforms";
 
 const LocationPicker = lazy(() =>
   import("@/components/location-picker").then((m) => ({ default: m.LocationPicker })),
 );
-
-const CATEGORY_OPTIONS = [
-  { value: "technology", label: "Technology" },
-  { value: "music", label: "Music" },
-  { value: "food_drink", label: "Food & Drink" },
-  { value: "business", label: "Business" },
-  { value: "wellness", label: "Wellness" },
-  { value: "arts_culture", label: "Arts & Culture" },
-  { value: "sports", label: "Sports" },
-] as const;
-
-const VIDEO_PLATFORM_OPTIONS = [
-  { value: "zoom", label: "Zoom" },
-  { value: "google_meet", label: "Google Meet" },
-  { value: "microsoft_teams", label: "Microsoft Teams" },
-  { value: "youtube_live", label: "YouTube Live" },
-  { value: "twitch", label: "Twitch" },
-  { value: "custom", label: "Custom / Other" },
-] as const;
 
 interface TicketTypeForm {
   id: string;

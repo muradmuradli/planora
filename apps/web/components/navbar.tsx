@@ -43,14 +43,14 @@ export function Navbar() {
   };
 
   return (
-    <nav className="glass sticky top-0 z-50 border-b">
+    <nav className="glass sticky top-0 z-50 border-b bg-white">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2.5">
           <Logo />
         </Link>
 
         <div className="hidden items-center gap-1 md:flex">
-          <Link href="/" className="rounded-lg px-3.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+          <Link href="/events" className="rounded-lg px-3.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
             Browse Events
           </Link>
           <Link href="/dashboard" className="rounded-lg px-3.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
@@ -171,7 +171,7 @@ export function Navbar() {
       {mobileOpen && (
         <div className="border-t bg-background p-4 md:hidden">
           <div className="flex flex-col gap-2">
-            <Link href="/" className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-secondary" onClick={() => setMobileOpen(false)}>
+            <Link href="/events" className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-secondary" onClick={() => setMobileOpen(false)}>
               Browse Events
             </Link>
             <Link href="/dashboard" className="rounded-lg px-3 py-2.5 text-sm font-medium text-foreground hover:bg-secondary" onClick={() => setMobileOpen(false)}>

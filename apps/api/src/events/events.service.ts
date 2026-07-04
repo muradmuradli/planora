@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { asc, eq } from 'drizzle-orm';
 
 import { db } from '../db';
 import { events, ticketTypes } from '../db/schema';
@@ -51,5 +52,44 @@ export class EventsService {
 
     const [event] = await db.insert(events).values(eventValues).returning();
     return { ...event, ticketTypes: [] };
+  }
+
+  async findAllPublic() {
+    return db.query.events.findMany({
+      where: eq(events.visibility, 'public'),
+      with: { ticketTypes: true },
+      orderBy: [asc(events.startDate)],
+    });
+  }
+
+  async findOne(id: string, requesterId?: string) {
+    const event = await db.query.events.findFirst({
+      where: eq(events.id, id),
+      with: {
+        ticketTypes: true,
+        organizer: { columns: { id: true, name: true, image: true } },
+      },
+    });
+
+    const isHidden =
+      !event || (event.visibility === 'private' && event.organizerId !== requesterId);
+
+    if (isHidden) {
+      throw new NotFoundException('Event not found');
+    }
+
+    if (event.organizerId === requesterId) {
+      return event;
+    }
+
+    // Hide join details from everyone except the organizer, since there's no
+    // attendee/RSVP gate yet to restrict who can see them.
+    return {
+      ...event,
+      eventLink: null,
+      meetingId: null,
+      passcode: null,
+      accessInstructions: null,
+    };
   }
 }
