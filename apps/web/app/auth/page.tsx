@@ -288,7 +288,7 @@ function AuthPageContent() {
     <AuthShell>
       <CardHeader className="text-start">
         <Logo />
-        <CardTitle className="text-2xl font-semibold tracking-tight">
+        <CardTitle className="text-2xl mt-5 font-semibold tracking-tight">
           {isSignUp ? 'Create your account' : 'Welcome back'}
         </CardTitle>
         <CardDescription>

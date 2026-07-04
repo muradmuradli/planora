@@ -71,7 +71,7 @@ function ResetPasswordContent() {
       <AuthShell>
         <CardHeader className="text-start">
           <Logo />
-          <CardTitle className="text-2xl font-semibold tracking-tight">
+          <CardTitle className="text-2xl mt-5 font-semibold tracking-tight">
             Link expired
           </CardTitle>
           <CardDescription>
@@ -95,7 +95,7 @@ function ResetPasswordContent() {
     <AuthShell>
       <CardHeader className="text-start mb-3">
         <Logo />
-        <CardTitle className="text-2xl font-semibold tracking-tight">
+        <CardTitle className="text-2xl mt-5 font-semibold tracking-tight">
           Set a new password
         </CardTitle>
         <CardDescription>

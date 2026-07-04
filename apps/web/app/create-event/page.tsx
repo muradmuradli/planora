@@ -282,9 +282,9 @@ export default function CreateEventPage() {
                     <button
                       type="button"
                       onClick={() => setVisibility("public")}
-                      className={`flex flex-1 items-center justify-center gap-2 rounded-xl border-2 p-3 text-sm font-medium ${
+                      className={`flex flex-1 items-center justify-center gap-2 rounded-xl border p-3 text-sm font-medium ${
                         visibility === "public"
-                          ? "border-primary bg-primary/5 text-primary"
+                          ? "border-slate-400 bg-primary/5 text-primary"
                           : "text-muted-foreground hover:bg-secondary"
                       }`}
                     >
@@ -293,9 +293,9 @@ export default function CreateEventPage() {
                     <button
                       type="button"
                       onClick={() => setVisibility("private")}
-                      className={`flex flex-1 items-center justify-center gap-2 rounded-xl border-2 p-3 text-sm font-medium ${
+                      className={`flex flex-1 items-center justify-center gap-2 rounded-xl border p-3 text-sm font-medium ${
                         visibility === "private"
-                          ? "border-primary bg-primary/5 text-primary"
+                          ? "border-slate-400 bg-primary/5 text-primary"
                           : "text-muted-foreground hover:bg-secondary"
                       }`}
                     >
@@ -509,8 +509,8 @@ export default function CreateEventPage() {
 
           {/* Actions */}
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-            <Button variant="outline" size="lg" type="button" className="rounded-xl">Save as Draft</Button>
-            <Button size="lg" type="submit" className="gap-2 rounded-xl" disabled={isSubmitting}>
+            <Button variant="outline" size="lg" type="button" className="rounded-xl px-8 py-5">Save as Draft</Button>
+            <Button size="lg" type="submit" className="gap-2 rounded-xl bg-rose-600 px-8 py-5 hover:bg-rose-700" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {isSubmitting ? "Publishing..." : "Publish Event"}
               {!isSubmitting && <ChevronRight className="h-4 w-4" />}
