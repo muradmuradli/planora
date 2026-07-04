@@ -1,5 +1,6 @@
 import dns from 'node:dns';
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 
 // Node's fetch (undici) can hang trying IPv6 first on networks where it's
@@ -11,6 +12,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bodyParser: false,   // Required for Better Auth
   });
+
+  app.useGlobalPipes(
+    new ValidationPipe({ whitelist: true, transform: true }),
+  );
 
   app.enableCors({
     origin: "http://localhost:3001",   // Next.js frontend

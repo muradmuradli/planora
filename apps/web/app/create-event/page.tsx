@@ -1,6 +1,8 @@
 'use client';
 
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast, Toaster } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,21 +10,164 @@ import { Textarea } from "@/components/ui/textarea";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import {
-  CalendarDays, MapPin, Image, Type, Globe, Lock,
+  CalendarDays, MapPin, Image as ImageIcon, Type, Globe, Lock,
   DollarSign, Upload, Plus, Trash2, ChevronRight, Video, Link2, Key, Loader2
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { apiFetch, ApiError } from "@/lib/api";
 
 const LocationPicker = lazy(() =>
   import("@/components/location-picker").then((m) => ({ default: m.LocationPicker })),
 );
 
+const CATEGORY_OPTIONS = [
+  { value: "technology", label: "Technology" },
+  { value: "music", label: "Music" },
+  { value: "food_drink", label: "Food & Drink" },
+  { value: "business", label: "Business" },
+  { value: "wellness", label: "Wellness" },
+  { value: "arts_culture", label: "Arts & Culture" },
+  { value: "sports", label: "Sports" },
+] as const;
+
+const VIDEO_PLATFORM_OPTIONS = [
+  { value: "zoom", label: "Zoom" },
+  { value: "google_meet", label: "Google Meet" },
+  { value: "microsoft_teams", label: "Microsoft Teams" },
+  { value: "youtube_live", label: "YouTube Live" },
+  { value: "twitch", label: "Twitch" },
+  { value: "custom", label: "Custom / Other" },
+] as const;
+
+interface TicketTypeForm {
+  id: string;
+  name: string;
+  price: string;
+  quantity: string;
+  salesEndDate: string;
+}
+
+function newTicketType(name = ""): TicketTypeForm {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    price: "",
+    quantity: "",
+    salesEndDate: "",
+  };
+}
+
 export default function CreateEventPage() {
+  const router = useRouter();
+
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState<string>("");
+  const [visibility, setVisibility] = useState<"public" | "private">("public");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
   const [isOnline, setIsOnline] = useState(false);
-  const [, setLocation] = useState("");
+  const [location, setLocation] = useState("");
+  const [videoPlatform, setVideoPlatform] = useState<string>("zoom");
+  const [eventLink, setEventLink] = useState("");
+  const [meetingId, setMeetingId] = useState("");
+  const [passcode, setPasscode] = useState("");
+  const [accessInstructions, setAccessInstructions] = useState("");
+
+  const [ticketTypes, setTicketTypes] = useState<TicketTypeForm[]>([
+    newTicketType("General Admission"),
+    newTicketType("VIP Pass"),
+  ]);
+
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const addTicketType = () =>
+    setTicketTypes((prev) => [...prev, newTicketType()]);
+
+  const removeTicketType = (id: string) =>
+    setTicketTypes((prev) => prev.filter((t) => t.id !== id));
+
+  const updateTicketType = (id: string, patch: Partial<TicketTypeForm>) =>
+    setTicketTypes((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, ...patch } : t)),
+    );
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!title.trim()) {
+      toast.error("Add a title", { description: "Your event needs a title." });
+      return;
+    }
+    if (!category) {
+      toast.error("Pick a category", { description: "Choose a category for your event." });
+      return;
+    }
+    if (!startDate || !endDate) {
+      toast.error("Add dates", { description: "Set a start and end date & time." });
+      return;
+    }
+    if (!isOnline && !location.trim()) {
+      toast.error("Add a location", { description: "In-person events need a venue or address." });
+      return;
+    }
+    if (isOnline && !eventLink.trim()) {
+      toast.error("Add an event link", { description: "Online events need a link to join." });
+      return;
+    }
+
+    const payload = {
+      title: title.trim(),
+      description: description.trim() || undefined,
+      category,
+      visibility,
+      startDate: new Date(startDate).toISOString(),
+      endDate: new Date(endDate).toISOString(),
+      isOnline,
+      location: isOnline ? undefined : location.trim(),
+      videoPlatform: isOnline ? videoPlatform : undefined,
+      eventLink: isOnline ? eventLink.trim() : undefined,
+      meetingId: isOnline ? meetingId.trim() || undefined : undefined,
+      passcode: isOnline ? passcode.trim() || undefined : undefined,
+      accessInstructions: isOnline ? accessInstructions.trim() || undefined : undefined,
+      imageUrl: imageFile ? imageFile.name : undefined,
+      ticketTypes: ticketTypes
+        .filter((t) => t.name.trim())
+        .map((t) => ({
+          name: t.name.trim(),
+          price: Number(t.price) || 0,
+          quantity: t.quantity.trim() ? Number(t.quantity) : undefined,
+          salesEndDate: t.salesEndDate
+            ? new Date(t.salesEndDate).toISOString()
+            : undefined,
+        })),
+    };
+
+    setIsSubmitting(true);
+    try {
+      await apiFetch("/events", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      toast.success("Event published", { description: "Your event is live." });
+      router.push("/");
+    } catch (err) {
+      toast.error("Could not publish event", {
+        description: err instanceof ApiError ? err.message : "Something went wrong",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
+      <Toaster richColors position="top-center" />
       <Navbar />
 
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
@@ -40,18 +185,33 @@ export default function CreateEventPage() {
         <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Create New Event</h1>
         <p className="mt-1 text-sm text-muted-foreground">Fill in the details to publish your event.</p>
 
-        <form className="mt-8 space-y-8" onSubmit={(e) => e.preventDefault()}>
+        <form className="mt-8 space-y-8" onSubmit={handleSubmit}>
           {/* Cover Image */}
           <div className="overflow-hidden rounded-2xl border-2 border-dashed bg-secondary/30 transition-colors hover:border-primary/30">
             <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
                 <Upload className="h-6 w-6 text-primary" />
               </div>
-              <p className="mt-4 text-sm font-medium text-foreground">Upload cover image</p>
+              <p className="mt-4 text-sm font-medium text-foreground">
+                {imageFile ? imageFile.name : "Upload cover image"}
+              </p>
               <p className="mt-1 text-xs text-muted-foreground">PNG, JPG, or GIF up to 5MB. Recommended: 1920×1080</p>
-              <Button variant="outline" size="sm" className="mt-4 gap-1.5">
-                <Image className="h-3.5 w-3.5" />
-                Choose File
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                className="mt-4 gap-1.5"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <ImageIcon className="h-3.5 w-3.5" />
+                {imageFile ? "Change File" : "Choose File"}
               </Button>
             </div>
           </div>
@@ -65,33 +225,61 @@ export default function CreateEventPage() {
             <div className="mt-5 space-y-4">
               <div className="space-y-1.5">
                 <Label>Event Title</Label>
-                <Input placeholder="Give your event a clear, catchy title" className="h-11 rounded-xl" />
+                <Input
+                  placeholder="Give your event a clear, catchy title"
+                  className="h-11 rounded-xl"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>Description</Label>
-                <Textarea placeholder="Describe what attendees can expect..." className="min-h-32 rounded-xl" />
+                <Textarea
+                  placeholder="Describe what attendees can expect..."
+                  className="min-h-32 rounded-xl"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Category</Label>
-                  <select className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                    <option>Select category</option>
-                    <option>Technology</option>
-                    <option>Music</option>
-                    <option>Food & Drink</option>
-                    <option>Business</option>
-                    <option>Wellness</option>
-                    <option>Arts & Culture</option>
-                    <option>Sports</option>
+                  <select
+                    className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                  >
+                    <option value="">Select category</option>
+                    {CATEGORY_OPTIONS.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Visibility</Label>
                   <div className="flex gap-2">
-                    <button className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-primary bg-primary/5 p-3 text-sm font-medium text-primary">
+                    <button
+                      type="button"
+                      onClick={() => setVisibility("public")}
+                      className={`flex flex-1 items-center justify-center gap-2 rounded-xl border-2 p-3 text-sm font-medium ${
+                        visibility === "public"
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "text-muted-foreground hover:bg-secondary"
+                      }`}
+                    >
                       <Globe className="h-4 w-4" /> Public
                     </button>
-                    <button className="flex flex-1 items-center justify-center gap-2 rounded-xl border p-3 text-sm font-medium text-muted-foreground hover:bg-secondary">
+                    <button
+                      type="button"
+                      onClick={() => setVisibility("private")}
+                      className={`flex flex-1 items-center justify-center gap-2 rounded-xl border-2 p-3 text-sm font-medium ${
+                        visibility === "private"
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "text-muted-foreground hover:bg-secondary"
+                      }`}
+                    >
                       <Lock className="h-4 w-4" /> Private
                     </button>
                   </div>
@@ -110,11 +298,21 @@ export default function CreateEventPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label>Start Date & Time</Label>
-                  <Input type="datetime-local" className="h-11 rounded-xl" />
+                  <Input
+                    type="datetime-local"
+                    className="h-11 rounded-xl"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label>End Date & Time</Label>
-                  <Input type="datetime-local" className="h-11 rounded-xl" />
+                  <Input
+                    type="datetime-local"
+                    className="h-11 rounded-xl"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
                 </div>
               </div>
               <div className="flex items-center justify-between rounded-xl border bg-secondary/30 px-4 py-3">
@@ -141,13 +339,13 @@ export default function CreateEventPage() {
                         <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input placeholder="Search for a venue or enter address" className="h-11 rounded-xl pl-10" />
                       </div>
-                      <div className="flex h-[320px] items-center justify-center rounded-xl border bg-secondary/30">
+                      <div className="flex h-80 items-center justify-center rounded-xl border bg-secondary/30">
                         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                       </div>
                     </div>
                   }
                 >
-                  <LocationPicker value="" onChange={(addr) => setLocation(addr)} />
+                  <LocationPicker value={location} onChange={(addr) => setLocation(addr)} />
                 </Suspense>
               ) : (
                 <div className="space-y-4 rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 p-5">
@@ -157,13 +355,16 @@ export default function CreateEventPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label>Platform</Label>
-                    <select className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                      <option>Zoom</option>
-                      <option>Google Meet</option>
-                      <option>Microsoft Teams</option>
-                      <option>YouTube Live</option>
-                      <option>Twitch</option>
-                      <option>Custom / Other</option>
+                    <select
+                      className="flex h-11 w-full rounded-xl border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                      value={videoPlatform}
+                      onChange={(e) => setVideoPlatform(e.target.value)}
+                    >
+                      {VIDEO_PLATFORM_OPTIONS.map((p) => (
+                        <option key={p.value} value={p.value}>
+                          {p.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div className="space-y-1.5">
@@ -174,6 +375,8 @@ export default function CreateEventPage() {
                         type="url"
                         placeholder="https://zoom.us/j/123456789"
                         className="h-11 rounded-xl pl-10"
+                        value={eventLink}
+                        onChange={(e) => setEventLink(e.target.value)}
                       />
                     </div>
                     <p className="text-xs text-muted-foreground">Attendees will receive this link after registering.</p>
@@ -181,13 +384,23 @@ export default function CreateEventPage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-1.5">
                       <Label>Meeting ID (optional)</Label>
-                      <Input placeholder="123 456 7890" className="h-11 rounded-xl" />
+                      <Input
+                        placeholder="123 456 7890"
+                        className="h-11 rounded-xl"
+                        value={meetingId}
+                        onChange={(e) => setMeetingId(e.target.value)}
+                      />
                     </div>
                     <div className="space-y-1.5">
                       <Label>Passcode (optional)</Label>
                       <div className="relative">
                         <Key className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input placeholder="••••••" className="h-11 rounded-xl pl-10" />
+                        <Input
+                          placeholder="••••••"
+                          className="h-11 rounded-xl pl-10"
+                          value={passcode}
+                          onChange={(e) => setPasscode(e.target.value)}
+                        />
                       </div>
                     </div>
                   </div>
@@ -196,6 +409,8 @@ export default function CreateEventPage() {
                     <Textarea
                       placeholder="Any extra info attendees need to join (waiting room, dial-in, dress code, etc.)"
                       className="min-h-20 rounded-xl"
+                      value={accessInstructions}
+                      onChange={(e) => setAccessInstructions(e.target.value)}
                     />
                   </div>
                 </div>
@@ -210,55 +425,63 @@ export default function CreateEventPage() {
               Tickets
             </h2>
             <div className="mt-5 space-y-4">
-              {/* Ticket type 1 */}
-              <div className="rounded-xl border p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-card-foreground">General Admission</span>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
+              {ticketTypes.map((ticket) => (
+                <div key={ticket.id} className="rounded-xl border p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <Input
+                      placeholder="Ticket name (e.g. General Admission)"
+                      className="h-9 rounded-lg text-sm font-medium"
+                      value={ticket.name}
+                      onChange={(e) => updateTicketType(ticket.id, { name: e.target.value })}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      type="button"
+                      className="h-7 w-7 shrink-0 text-destructive"
+                      onClick={() => removeTicketType(ticket.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Price</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        className="h-9 rounded-lg text-sm"
+                        value={ticket.price}
+                        onChange={(e) => updateTicketType(ticket.id, { price: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Quantity</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="Unlimited"
+                        className="h-9 rounded-lg text-sm"
+                        value={ticket.quantity}
+                        onChange={(e) => updateTicketType(ticket.id, { quantity: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Sales End</Label>
+                      <Input
+                        type="date"
+                        className="h-9 rounded-lg text-sm"
+                        value={ticket.salesEndDate}
+                        onChange={(e) => updateTicketType(ticket.id, { salesEndDate: e.target.value })}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Price</Label>
-                    <Input placeholder="$0.00" className="h-9 rounded-lg text-sm" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Quantity</Label>
-                    <Input placeholder="Unlimited" className="h-9 rounded-lg text-sm" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Sales End</Label>
-                    <Input type="date" className="h-9 rounded-lg text-sm" />
-                  </div>
-                </div>
-              </div>
+              ))}
 
-              {/* Ticket type 2 */}
-              <div className="rounded-xl border p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-card-foreground">VIP Pass</span>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Price</Label>
-                    <Input placeholder="$0.00" className="h-9 rounded-lg text-sm" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Quantity</Label>
-                    <Input placeholder="Unlimited" className="h-9 rounded-lg text-sm" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Sales End</Label>
-                    <Input type="date" className="h-9 rounded-lg text-sm" />
-                  </div>
-                </div>
-              </div>
-
-              <Button variant="outline" className="w-full gap-1.5" type="button">
+              <Button variant="outline" className="w-full gap-1.5" type="button" onClick={addTicketType}>
                 <Plus className="h-4 w-4" />
                 Add Ticket Type
               </Button>
@@ -267,10 +490,11 @@ export default function CreateEventPage() {
 
           {/* Actions */}
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-            <Button variant="outline" size="lg" className="rounded-xl">Save as Draft</Button>
-            <Button size="lg" className="gap-2 rounded-xl">
-              Publish Event
-              <ChevronRight className="h-4 w-4" />
+            <Button variant="outline" size="lg" type="button" className="rounded-xl">Save as Draft</Button>
+            <Button size="lg" type="submit" className="gap-2 rounded-xl" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isSubmitting ? "Publishing..." : "Publish Event"}
+              {!isSubmitting && <ChevronRight className="h-4 w-4" />}
             </Button>
           </div>
         </form>

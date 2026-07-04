@@ -1,5 +1,15 @@
+import { randomUUID } from "node:crypto";
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  integer,
+  numeric,
+  pgEnum,
+  index,
+} from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -73,9 +83,107 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
+export const EVENT_CATEGORIES = [
+  "technology",
+  "music",
+  "food_drink",
+  "business",
+  "wellness",
+  "arts_culture",
+  "sports",
+] as const;
+export type EventCategory = (typeof EVENT_CATEGORIES)[number];
+export const eventCategoryEnum = pgEnum("event_category", EVENT_CATEGORIES);
+
+export const EVENT_VISIBILITIES = ["public", "private"] as const;
+export type EventVisibility = (typeof EVENT_VISIBILITIES)[number];
+export const eventVisibilityEnum = pgEnum(
+  "event_visibility",
+  EVENT_VISIBILITIES,
+);
+
+export const VIDEO_PLATFORMS = [
+  "zoom",
+  "google_meet",
+  "microsoft_teams",
+  "youtube_live",
+  "twitch",
+  "custom",
+] as const;
+export type VideoPlatform = (typeof VIDEO_PLATFORMS)[number];
+export const videoPlatformEnum = pgEnum("video_platform", VIDEO_PLATFORMS);
+
+export const events = pgTable(
+  "event",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => randomUUID()),
+    organizerId: text("organizer_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    category: eventCategoryEnum("category").notNull(),
+    visibility: eventVisibilityEnum("visibility").default("public").notNull(),
+    startDate: timestamp("start_date").notNull(),
+    endDate: timestamp("end_date").notNull(),
+    isOnline: boolean("is_online").default(false).notNull(),
+    location: text("location"),
+    videoPlatform: videoPlatformEnum("video_platform"),
+    eventLink: text("event_link"),
+    meetingId: text("meeting_id"),
+    passcode: text("passcode"),
+    accessInstructions: text("access_instructions"),
+    imageUrl: text("image_url"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("event_organizerId_idx").on(table.organizerId)],
+);
+
+export const ticketTypes = pgTable(
+  "ticket_type",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => randomUUID()),
+    eventId: text("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    price: numeric("price", { precision: 10, scale: 2 })
+      .default("0")
+      .notNull(),
+    quantity: integer("quantity"),
+    salesEndDate: timestamp("sales_end_date"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("ticketType_eventId_idx").on(table.eventId)],
+);
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
+  events: many(events),
+}));
+
+export const eventRelations = relations(events, ({ one, many }) => ({
+  organizer: one(user, {
+    fields: [events.organizerId],
+    references: [user.id],
+  }),
+  ticketTypes: many(ticketTypes),
+}));
+
+export const ticketTypeRelations = relations(ticketTypes, ({ one }) => ({
+  event: one(events, {
+    fields: [ticketTypes.eventId],
+    references: [events.id],
+  }),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({

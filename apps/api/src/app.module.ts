@@ -5,9 +5,10 @@ import { AuthModule } from '@thallesp/nestjs-better-auth';
 import { AppService } from './app.service';
 import { AppController } from './app.controller';
 import { auth } from './auth';
+import { EventsModule } from './events/events.module';
 
 @Module({
-  imports: [AuthModule.forRoot({ auth }),],
+  imports: [AuthModule.forRoot({ auth }), EventsModule],
   controllers: [AppController],
   providers: [AppService],
 })
