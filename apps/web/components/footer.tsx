@@ -1,5 +1,6 @@
 import { CalendarDays } from "lucide-react";
 import Link from "next/link"
+import Logo from "./logo";
 
 export function Footer() {
   return (
@@ -8,10 +9,7 @@ export function Footer() {
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <Link href="/" className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <CalendarDays className="h-4 w-4 text-primary-foreground" />
-              </div>
-              <span className="text-lg font-bold text-foreground">Eventify</span>
+              <Logo />
             </Link>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
               The modern platform for creating, discovering, and managing unforgettable events.
